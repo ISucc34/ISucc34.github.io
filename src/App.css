@@ -41,6 +41,7 @@
 
 .projects{
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
 }
 
@@ -52,6 +53,8 @@
   height: 100%;
   width: 100%;
   max-width: 20em;
+  color: inherit;
+  background: rgba(10, 12, 30, 0.6);
   border-color: rgb(255, 255, 255);
   padding: 10px;
   margin: 10px;
@@ -105,3 +108,57 @@
 }
 
 
+
+/* ---- Solar system (three.js) ---- */
+main { width: 100%; }
+.hint { margin: 0; opacity: 0.7; }
+.back { display: inline-block; margin-bottom: 1rem; }
+.soon { opacity: 0.8; margin: 2rem 0; }
+
+.scene {
+  position: relative;
+  width: 100%;
+  height: clamp(340px, 48vw, 600px);
+  margin-top: 0.5rem;
+}
+.scene canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.labels {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.planet-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 6px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-shadow: 0 0 6px #000, 0 0 3px #000;
+  opacity: 0.85;
+  pointer-events: auto;
+  will-change: transform;
+  transition: opacity 200ms, text-shadow 200ms;
+}
+.planet-label:hover,
+.planet-label:focus-visible,
+.planet-label.hot {
+  color: #fff;
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(161, 95, 197, 1), 0 0 6px #000;
+}
+
+@media (max-width: 720px) {
+  .scene { height: 105vw; }
+  .planet-label { font-size: 0.7rem; padding: 2px 3px; }
+}

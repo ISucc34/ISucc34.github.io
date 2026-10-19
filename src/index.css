@@ -3,9 +3,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
+  color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #05060f;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -54,15 +54,36 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+
+/* ---- Space background ---- */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }
+body::before {
+  background:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 90px 140px, #fff, transparent),
+    radial-gradient(1px 1px at 160px 70px, #cfe0ff, transparent),
+    radial-gradient(1px 1px at 230px 200px, #fff, transparent),
+    radial-gradient(2px 2px at 310px 120px, #fff, transparent),
+    radial-gradient(1px 1px at 60px 250px, #ffe3ef, transparent);
+  background-size: 340px 300px;
+}
+body::after {
+  background:
+    radial-gradient(ellipse at 18% 12%, rgba(95, 60, 175, 0.28), transparent 55%),
+    radial-gradient(ellipse at 88% 85%, rgba(30, 95, 175, 0.24), transparent 55%),
+    radial-gradient(1px 1px at 50px 80px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 200px 300px, #fff, transparent),
+    radial-gradient(1px 1px at 380px 160px, #cfe0ff, transparent),
+    radial-gradient(2px 2px at 450px 400px, #fff, transparent);
+  background-size: auto, auto, 520px 460px, 520px 460px, 520px 460px, 520px 460px;
+  animation: twinkle 6s ease-in-out infinite alternate;
+}
+@keyframes twinkle { from { opacity: 0.55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { body::after { animation: none; } }
