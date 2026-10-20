@@ -42,4 +42,4 @@ export function Contact() {
 }
 
 // Placeholder for pages that don't have content yet - replace in App.jsx
-export const ComingSoon = () => <p className="soon">This planet hasn't been explored yet. Content coming soon.</p>
+export const ComingSoon = () => <p className="soon">This page is still being built. Content coming soon.</p>

@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 const TAU = Math.PI * 2
-const SCALE = 5 // world units per unit of `o` (orbit diameter) and `p` (planet diameter)
+const SCALE = 5.6 // world units per unit of `o` (orbit diameter) and `p` (planet diameter)
 
 // ---- procedural textures (painted on canvases, so no image files are needed) ----
 function rgba(color) {
@@ -101,6 +101,94 @@ function ringTexture(innerRatio) {
   return toTexture(c)
 }
 
+function diskTexture(innerRatio) {
+  const S = 512, C = S / 2
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const g = c.getContext('2d')
+  const heat = (f) => (f < 0.25 ? '255,245,215' : f < 0.6 ? '255,170,70' : '210,80,25')
+  for (let r = innerRatio * C; r < C; r += 1) { // smooth base glow, hotter near the hole
+    const f = (r - innerRatio * C) / (C - innerRatio * C)
+    g.strokeStyle = `rgba(${heat(f)},${0.5 * (1 - f) ** 1.5})`
+    g.lineWidth = 1.5
+    g.beginPath()
+    g.arc(C, C, r, 0, TAU)
+    g.stroke()
+  }
+  for (let i = 0; i < 900; i++) { // streaks, so the spin is visible
+    const f = Math.random() ** 1.4
+    const r = innerRatio * C + f * (C - innerRatio * C)
+    const a0 = Math.random() * TAU
+    g.strokeStyle = `rgba(${heat(f)},${(0.2 + Math.random() * 0.6) * (1 - f * 0.8)})`
+    g.lineWidth = 1 + Math.random() * 2
+    g.beginPath()
+    g.arc(C, C, r, a0, a0 + 0.1 + Math.random() * 0.8)
+    g.stroke()
+  }
+  return toTexture(c)
+}
+
+function haloTexture() { // bright thin ring just outside the black hole, transparent in the middle
+  const c = document.createElement('canvas')
+  c.width = c.height = 256
+  const g = c.getContext('2d')
+  const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128)
+  grad.addColorStop(0, 'rgba(0,0,0,0)')
+  grad.addColorStop(0.27, 'rgba(0,0,0,0)')
+  grad.addColorStop(0.3, 'rgba(255,240,200,1)')
+  grad.addColorStop(0.38, 'rgba(255,150,40,.65)')
+  grad.addColorStop(0.62, 'rgba(255,100,20,.18)')
+  grad.addColorStop(1, 'rgba(255,100,20,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, 256, 256)
+  return toTexture(c)
+}
+
+function buildStation() {
+  const metal = new THREE.MeshStandardMaterial({ color: 0xb8c0cc, metalness: 0.6, roughness: 0.4 })
+  const panel = new THREE.MeshStandardMaterial({ color: 0x1b3a7a, metalness: 0.3, roughness: 0.5, emissive: 0x0a1a40 })
+  const lamp = new THREE.MeshBasicMaterial({ color: 0xffe9a8 })
+  const g = new THREE.Group()
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), metal)) // hub
+
+  const wheel = new THREE.Group() // rotating habitat ring
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.04, 12, 48), metal)
+  ring.rotation.x = Math.PI / 2
+  wheel.add(ring)
+  for (let k = 0; k < 4; k++) {
+    const arm = new THREE.Group()
+    arm.rotation.y = (k * Math.PI) / 2
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.02, 0.02), metal)
+    spoke.position.x = 0.18
+    arm.add(spoke)
+    wheel.add(arm)
+  }
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * TAU
+    const w = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), lamp)
+    w.position.set(Math.cos(a) * 0.4, 0, Math.sin(a) * 0.4)
+    wheel.add(w)
+  }
+  g.add(wheel)
+
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.03, 0.03), metal)
+  beam.position.y = 0.34
+  g.add(beam)
+  for (const side of [-1, 1]) { // solar panels
+    const sp = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.015, 0.26), panel)
+    sp.position.set(side * 0.95, 0.34, 0)
+    g.add(sp)
+  }
+  const dish = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.1, 16), metal)
+  dish.position.y = 0.46
+  g.add(dish)
+
+  g.scale.setScalar(0.85)
+  g.rotation.z = 0.12
+  g.userData.wheel = wheel
+  return g
+}
+
 // ---- the scene ----
 export function createSolarScene({ container, planets, labels, onSelect }) {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -117,7 +205,7 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   scene.add(new THREE.PointLight(0xfff1d6, 3.2, 0, 0))
 
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(0.7, 48, 32),
+    new THREE.SphereGeometry(0.75, 48, 32),
     new THREE.MeshBasicMaterial({ map: sunTexture() }),
   )
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -127,7 +215,15 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   scene.add(sun, glow)
 
   const hits = []
-  const items = planets.map((p, i) => {
+
+  function addHit(parent, radius, i) { // generous invisible click target, since things keep moving
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), new THREE.MeshBasicMaterial({ visible: false }))
+    hit.userData.index = i
+    parent.add(hit)
+    hits.push(hit)
+  }
+
+  function buildPlanet(p, i) {
     const radius = Math.max(0.14, p.p * 6)
     const orbitR = p.o * SCALE
 
@@ -155,15 +251,7 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
       ring.rotation.x = -Math.PI / 2
       tilt.add(ring)
     }
-
-    // generous invisible click target, since planets keep moving
-    const hit = new THREE.Mesh(
-      new THREE.SphereGeometry(Math.max(radius * 1.7, 0.32), 8, 6),
-      new THREE.MeshBasicMaterial({ visible: false }),
-    )
-    hit.userData.index = i
-    tilt.add(hit)
-    hits.push(hit)
+    addHit(tilt, Math.max(radius * 1.7, 0.32), i)
 
     const pts = []
     for (let k = 0; k < 160; k++) pts.push(new THREE.Vector3(Math.cos((k / 160) * TAU) * orbitR, 0, Math.sin((k / 160) * TAU) * orbitR))
@@ -173,20 +261,66 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
     ))
     scene.add(pivot)
 
-    return { p, radius, pivot, holder, tilt, mesh, scale: 1 }
-  })
+    return { p, pivot, holder, tilt, mesh, anchor: tilt, dropBase: radius * (p.ring ? 1.35 : 1.1), scale: 1 }
+  }
 
-  // ---- sizing: low sideways angle, as close as possible while the whole system stays in frame ----
+  function buildHole(p, i) {
+    const R = 0.8
+    const group = new THREE.Group()
+    group.position.set(...p.pos)
+    const body = new THREE.Group() // hole + disk; scaled on hover
+    group.add(body)
+
+    body.add(new THREE.Mesh(new THREE.SphereGeometry(R, 48, 32), new THREE.MeshBasicMaterial({ color: 0x000000 })))
+    const tiltG = new THREE.Group()
+    tiltG.rotation.x = -Math.PI / 2 + 0.45 // disk lies flat, tipped a little toward the viewer
+    const disk = new THREE.Mesh(
+      new THREE.RingGeometry(R * 1.35, R * 3.2, 128),
+      new THREE.MeshBasicMaterial({
+        map: diskTexture(1.35 / 3.2), side: THREE.DoubleSide, transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    )
+    tiltG.add(disk)
+    body.add(tiltG)
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: haloTexture(), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
+    }))
+    halo.scale.setScalar(R * 7.3)
+    body.add(halo)
+    addHit(body, R * 2.4, i)
+
+    const station = buildStation() // hovers above the hole
+    station.position.y = R * 2.7
+    group.add(station)
+    scene.add(group)
+
+    return { p, body, disk, station, baseY: station.position.y, anchor: group, dropBase: 1.9, scale: 1 }
+  }
+
+  const items = planets.map((p, i) => (p.kind === 'hole' ? buildHole(p, i) : buildPlanet(p, i)))
+
+  // ---- sizing: low sideways angle, as close as possible while everything stays in frame ----
   let width = 1, height = 1
   const probe = new THREE.Vector3()
-  const frontPoint = new THREE.Vector3(0, -0.8, SCALE + 0.5) // front of the outer orbit, plus label room
-  const backPoint = new THREE.Vector3(0, 0.5, -SCALE - 0.4)
-  const sidePoint = new THREE.Vector3(SCALE + 0.5, 0, 0)
+  const fitPoints = [
+    new THREE.Vector3(0, -0.8, SCALE + 0.5),   // front of the outer orbit, plus label room
+    new THREE.Vector3(0, 0.5, -SCALE - 0.4),   // back of the outer orbit
+    new THREE.Vector3(-SCALE - 0.5, 0, 0),
+    new THREE.Vector3(SCALE + 0.5, 0, 0),
+  ]
+  for (const p of planets) {
+    if (p.kind !== 'hole') continue
+    const [x, y, z] = p.pos // left / top (station) / right of the black hole
+    fitPoints.push(new THREE.Vector3(x - 2.6, y, z), new THREE.Vector3(x, y + 3.2, z), new THREE.Vector3(x + 2.6, y, z))
+  }
+  const midX = (Math.min(...fitPoints.map((p) => p.x)) + Math.max(...fitPoints.map((p) => p.x))) / 2
   const fits = () => {
     camera.updateMatrixWorld()
-    return probe.copy(frontPoint).project(camera).y > -0.88
-      && probe.copy(backPoint).project(camera).y < 0.9
-      && Math.abs(probe.copy(sidePoint).project(camera).x) < 0.93
+    return fitPoints.every((p) => {
+      probe.copy(p).project(camera)
+      return Math.abs(probe.x) < 0.93 && probe.y > -0.88 && probe.y < 0.9
+    })
   }
   function resize() {
     width = container.clientWidth || 1
@@ -196,9 +330,9 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
     camera.updateProjectionMatrix()
     const portrait = camera.aspect < 1
     const elev = THREE.MathUtils.degToRad(portrait ? 34 : 14) // sideways view; a bit steeper on phones
-    const aim = new THREE.Vector3(0, 0, portrait ? 0 : 4)     // aim toward the front so the near planets fit
-    for (let d = 7; d < 40; d += 0.1) {
-      camera.position.set(0, d * Math.sin(elev), d * Math.cos(elev))
+    const aim = new THREE.Vector3(midX, 0, portrait ? 0 : 4)  // centre on the whole scene, leaning toward the front
+    for (let d = 7; d < 60; d += 0.1) {
+      camera.position.set(midX, d * Math.sin(elev), d * Math.cos(elev))
       camera.lookAt(aim)
       if (fits()) break
     }
@@ -243,26 +377,36 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   // ---- animation ----
   const v = new THREE.Vector3()
   let last = performance.now()
+  let time = 0
   renderer.setAnimationLoop((now) => {
     const dt = reduceMotion ? 0 : Math.min((now - last) / 1000, 0.1)
     last = now
+    time += dt
 
     sun.rotation.y += dt * 0.05
     for (const [i, it] of items.entries()) {
-      it.pivot.rotation.y += (dt * TAU) / it.p.t
-      it.holder.rotation.y = -it.pivot.rotation.y
-      it.mesh.rotation.y += ((it.p.rev ? -1 : 1) * dt * TAU) / it.p.r
       it.scale += ((hovered === i ? 1.3 : 1) - it.scale) * 0.15
-      it.tilt.scale.setScalar(it.scale)
+      if (it.p.kind === 'hole') {
+        it.body.scale.setScalar(1 + (it.scale - 1) * 0.5)
+        it.disk.rotation.z += dt * 0.5
+        it.station.position.y = it.baseY + Math.sin(time * 0.8) * 0.08
+        it.station.rotation.y += dt * 0.2
+        it.station.userData.wheel.rotation.y += dt * 0.6
+      } else {
+        it.pivot.rotation.y += (dt * TAU) / it.p.t
+        it.holder.rotation.y = -it.pivot.rotation.y
+        it.mesh.rotation.y += ((it.p.rev ? -1 : 1) * dt * TAU) / it.p.r
+        it.tilt.scale.setScalar(it.scale)
+      }
     }
     renderer.render(scene, camera)
 
-    // put each HTML label just under its planet
+    // put each HTML label just under its planet / the black hole
     for (const [i, it] of items.entries()) {
       const el = labels[i]
       if (!el) continue
-      it.tilt.getWorldPosition(v)
-      v.y -= it.radius * it.scale * (it.p.ring ? 1.35 : 1.1)
+      it.anchor.getWorldPosition(v)
+      v.y -= it.dropBase * it.scale
       v.project(camera)
       el.style.transform = `translate(${(v.x * 0.5 + 0.5) * width}px, ${(-v.y * 0.5 + 0.5) * height}px) translate(-50%, 4px)`
     }
