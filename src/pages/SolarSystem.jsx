@@ -19,7 +19,7 @@ export default function SolarSystem() {
 
   return (
     <main>
-      <h1>Isaac's Portfolio</h1>
+      <h1>Isaac Gonzalez</h1>
       <p className="hint">Pick a planet to explore</p>
       <div className="scene" ref={mount}>
         {/* the labels are real links: they sit under each planet and keep the page keyboard-accessible */}

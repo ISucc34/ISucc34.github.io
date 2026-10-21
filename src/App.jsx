@@ -1,7 +1,7 @@
 import { Routes, Route, Link, Navigate } from 'react-router-dom'
 import { planets } from './planets'
 import SolarSystem from './pages/SolarSystem'
-import { Frameworks, Technologies, Projects, Contact, ComingSoon } from './pages/Pages'
+import { Frameworks, Technologies, Projects, Contact, About, Education, Research, Experience, ComingSoon } from './pages/Pages'
 import './App.css'
 
 // Which component each planet's page shows. Swap ComingSoon for real content later.
@@ -10,6 +10,10 @@ const content = {
   technologies: Technologies,
   projects: Projects,
   contact: Contact,
+  about: About,
+  education: Education,
+  research: Research,
+  experience: Experience,
 }
 
 function App() {
