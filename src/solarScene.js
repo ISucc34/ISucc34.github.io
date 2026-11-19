@@ -205,13 +205,13 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   scene.add(new THREE.PointLight(0xfff1d6, 3.2, 0, 0))
 
   const sun = new THREE.Mesh(
-    new THREE.SphereGeometry(0.75, 48, 32),
+    new THREE.SphereGeometry(0.85, 48, 32),
     new THREE.MeshBasicMaterial({ map: sunTexture() }),
   )
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowTexture(), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
   }))
-  glow.scale.setScalar(6)
+  glow.scale.setScalar(6.5)
   scene.add(sun, glow)
 
   const hits = []
@@ -224,7 +224,7 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   }
 
   function buildPlanet(p, i) {
-    const radius = Math.max(0.14, p.p * 6)
+    const radius = Math.max(0.2, p.p * 8)
     const orbitR = p.o * SCALE
 
     const pivot = new THREE.Group()      // spins to move the planet around the sun
@@ -304,7 +304,7 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   let width = 1, height = 1
   const probe = new THREE.Vector3()
   const fitPoints = [
-    new THREE.Vector3(0, -0.8, SCALE + 0.5),   // front of the outer orbit, plus label room
+    new THREE.Vector3(0, -0.8, SCALE + 0.4),   // front of the outer orbit, plus label room
     new THREE.Vector3(0, 0.5, -SCALE - 0.4),   // back of the outer orbit
     new THREE.Vector3(-SCALE - 0.5, 0, 0),
     new THREE.Vector3(SCALE + 0.5, 0, 0),
@@ -312,14 +312,15 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
   for (const p of planets) {
     if (p.kind !== 'hole') continue
     const [x, y, z] = p.pos // left / top (station) / right of the black hole
-    fitPoints.push(new THREE.Vector3(x - 2.6, y, z), new THREE.Vector3(x, y + 3.2, z), new THREE.Vector3(x + 2.6, y, z))
+    fitPoints.push(new THREE.Vector3(x - 2.5, y, z), new THREE.Vector3(x, y + 2.9, z), new THREE.Vector3(x + 2.5, y, z))
   }
   const midX = (Math.min(...fitPoints.map((p) => p.x)) + Math.max(...fitPoints.map((p) => p.x))) / 2
+  const ys = []
   const fits = () => {
     camera.updateMatrixWorld()
     return fitPoints.every((p) => {
       probe.copy(p).project(camera)
-      return Math.abs(probe.x) < 0.93 && probe.y > -0.88 && probe.y < 0.9
+      return Math.abs(probe.x) < 0.97 && probe.y > -0.92 && probe.y < 0.94
     })
   }
   function resize() {
@@ -330,9 +331,17 @@ export function createSolarScene({ container, planets, labels, onSelect }) {
     camera.updateProjectionMatrix()
     const portrait = camera.aspect < 1
     const elev = THREE.MathUtils.degToRad(portrait ? 34 : 14) // sideways view; a bit steeper on phones
-    const aim = new THREE.Vector3(midX, 0, portrait ? 0 : 4)  // centre on the whole scene, leaning toward the front
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+    const aim = new THREE.Vector3(midX, 0, portrait ? 0 : 4)
     for (let d = 7; d < 60; d += 0.1) {
       camera.position.set(midX, d * Math.sin(elev), d * Math.cos(elev))
+      aim.y = 0
+      camera.lookAt(aim)
+      camera.updateMatrixWorld()
+      ys.length = 0
+      for (const p of fitPoints) ys.push(probe.copy(p).project(camera).y)
+      // nudge the aim so the scene sits in the middle of the frame vertically (no wasted space above or below)
+      aim.y = ((Math.max(...ys) + Math.min(...ys)) / 2) * d * tanHalf
       camera.lookAt(aim)
       if (fits()) break
     }
